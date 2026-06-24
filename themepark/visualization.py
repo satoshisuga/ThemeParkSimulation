@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from math import cos, pi, sin
+from math import cos, hypot, pi, sin
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -45,7 +45,7 @@ def format_optional(value: float | None, digits: int = 2) -> str:
     return f"{value:.{digits}f}"
 
 
-def format_wait_minutes(wait_steps: float | None, step_seconds: int = 10) -> str:
+def format_wait_minutes(wait_steps: float | None, step_seconds: int = 1) -> str:
     minutes = wait_steps_to_minutes(wait_steps, step_seconds)
     if minutes is None:
         return "-"
@@ -85,6 +85,8 @@ def create_park_canvas_html(sim: "Simulation", max_visitors: int = 1200) -> str:
             x, y = queue_positions.get(visitor.id, (x, y))
         elif visitor.state == AgentState.RIDING:
             x, y = rider_positions.get(visitor.id, (x, y))
+        elif visitor.state in {AgentState.MOVING, AgentState.EXITING}:
+            x, y = _lane_adjusted_position(visitor, sim.config.path_lane_count)
         target = "-"
         if visitor.target_attraction_id is not None:
             target = sim.attractions[visitor.target_attraction_id].name
@@ -148,6 +150,8 @@ def create_park_figure(sim: "Simulation", max_visitors: int = 1200) -> go.Figure
                 x, y = queue_positions.get(visitor.id, (x, y))
             elif visitor.state == AgentState.RIDING:
                 x, y = rider_positions.get(visitor.id, (x, y))
+            elif visitor.state in {AgentState.MOVING, AgentState.EXITING}:
+                x, y = _lane_adjusted_position(visitor, sim.config.path_lane_count)
             target = "-"
             if visitor.target_attraction_id is not None:
                 target = sim.attractions[visitor.target_attraction_id].name
@@ -318,6 +322,26 @@ def _visible_visitors(sim: "Simulation", max_visitors: int):
         return visitors
     stride = int(np.ceil(len(visitors) / max_visitors))
     return visitors[::stride]
+
+
+def _lane_adjusted_position(visitor, lane_count: int) -> tuple[float, float]:
+    if (
+        visitor.current_segment_id is None
+        or visitor.route_index >= len(visitor.route)
+        or lane_count <= 1
+    ):
+        return visitor.x, visitor.y
+    target = visitor.route[visitor.route_index]
+    dx = target.x - visitor.x
+    dy = target.y - visitor.y
+    distance = hypot(dx, dy)
+    if distance <= 1e-9:
+        return visitor.x, visitor.y
+    lane_offset = (visitor.path_lane_index - (lane_count - 1) / 2) * 0.65
+    return (
+        visitor.x - dy / distance * lane_offset,
+        visitor.y + dx / distance * lane_offset,
+    )
 
 
 def _queue_positions(sim: "Simulation") -> dict[int, tuple[float, float]]:
@@ -498,7 +522,7 @@ _CANVAS_TEMPLATE = """
       ctx.save();
       ctx.lineCap = "round";
       ctx.lineJoin = "round";
-      ctx.lineWidth = 15;
+      ctx.lineWidth = 21;
       ctx.strokeStyle = "#d7c9aa";
       for (const edge of data.paths) {
         const start = toScreen(edge.from, width, height);
@@ -508,7 +532,7 @@ _CANVAS_TEMPLATE = """
         ctx.lineTo(end.x, end.y);
         ctx.stroke();
       }
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 3;
       ctx.strokeStyle = "#b9a476";
       for (const edge of data.paths) {
         const start = toScreen(edge.from, width, height);

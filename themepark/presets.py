@@ -16,13 +16,13 @@ INFORMATION_FRESHNESS_OPTIONS: dict[str, dict[str, int | str]] = {
     },
     "slightly_old": {
         "label": "少し古い",
-        "information_update_interval_steps": 12,
-        "information_delay_steps": 6,
+        "information_update_interval_steps": 120,
+        "information_delay_steps": 60,
     },
     "old": {
         "label": "かなり古い",
-        "information_update_interval_steps": 30,
-        "information_delay_steps": 12,
+        "information_update_interval_steps": 300,
+        "information_delay_steps": 120,
     },
 }
 
@@ -63,8 +63,8 @@ PRESETS: dict[str, Preset] = {
         updates={
             "seed": 42,
             "information_rate": 0.0,
-            "information_update_interval_steps": 12,
-            "information_delay_steps": 6,
+            "information_update_interval_steps": 120,
+            "information_delay_steps": 60,
             "congestion_weight_mean": 0.0,
             "preference_diversity": 0.45,
             "choice_noise": FIXED_CHOICE_NOISE,
@@ -77,8 +77,8 @@ PRESETS: dict[str, Preset] = {
         updates={
             "seed": 42,
             "information_rate": 0.5,
-            "information_update_interval_steps": 12,
-            "information_delay_steps": 6,
+            "information_update_interval_steps": 120,
+            "information_delay_steps": 60,
             "congestion_weight_mean": 1.1,
             "preference_diversity": 0.45,
             "choice_noise": FIXED_CHOICE_NOISE,
@@ -91,8 +91,8 @@ PRESETS: dict[str, Preset] = {
         updates={
             "seed": 42,
             "information_rate": 1.0,
-            "information_update_interval_steps": 30,
-            "information_delay_steps": 12,
+            "information_update_interval_steps": 300,
+            "information_delay_steps": 120,
             "congestion_weight_mean": 1.8,
             "preference_diversity": 0.15,
             "choice_noise": FIXED_CHOICE_NOISE,
@@ -105,8 +105,8 @@ PRESETS: dict[str, Preset] = {
         updates={
             "seed": 42,
             "information_rate": 1.0,
-            "information_update_interval_steps": 30,
-            "information_delay_steps": 12,
+            "information_update_interval_steps": 300,
+            "information_delay_steps": 120,
             "congestion_weight_mean": 1.8,
             "preference_diversity": 0.65,
             "choice_noise": FIXED_CHOICE_NOISE,
@@ -118,8 +118,8 @@ PRESETS: dict[str, Preset] = {
         label="E: 効率と満足度は同じか",
         updates={
             "seed": 42,
-            "information_update_interval_steps": 12,
-            "information_delay_steps": 6,
+            "information_update_interval_steps": 120,
+            "information_delay_steps": 60,
             "congestion_weight_mean": 1.2,
             "preference_diversity": 0.35,
             "choice_noise": FIXED_CHOICE_NOISE,
@@ -135,8 +135,8 @@ PRESETS: dict[str, Preset] = {
         updates={
             "seed": 42,
             "information_rate": 1.0,
-            "information_update_interval_steps": 12,
-            "information_delay_steps": 6,
+            "information_update_interval_steps": 120,
+            "information_delay_steps": 60,
             "congestion_weight_mean": 1.3,
             "preference_diversity": 0.35,
             "choice_noise": FIXED_CHOICE_NOISE,

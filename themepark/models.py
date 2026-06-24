@@ -3,9 +3,13 @@ from __future__ import annotations
 from collections import deque
 from dataclasses import dataclass, field
 from enum import StrEnum
+from typing import TYPE_CHECKING
 
 import numpy as np
 from numpy.typing import NDArray
+
+if TYPE_CHECKING:
+    from themepark.pathing import RouteStep
 
 
 class AgentState(StrEnum):
@@ -33,8 +37,10 @@ class VisitorAgent:
     visited: NDArray[np.bool_]
     ride_count: int = 0
     target_attraction_id: int | None = None
-    route: list[tuple[float, float]] = field(default_factory=list)
+    route: list["RouteStep"] = field(default_factory=list)
     route_index: int = 0
+    current_segment_id: str | None = None
+    path_lane_index: int = 0
 
     entered_at: int | None = None
     exited_at: int | None = None

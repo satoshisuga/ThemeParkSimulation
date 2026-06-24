@@ -22,30 +22,31 @@ class AttractionSpec:
 
 
 DEFAULT_ATTRACTION_SPECS: tuple[AttractionSpec, ...] = (
-    AttractionSpec(0, "スカイコースター", 12, 15, 1.00, 8, 36),
-    AttractionSpec(1, "スプラッシュライド", 50, 10, 0.90, 8, 34),
-    AttractionSpec(2, "スペースフライト", 88, 15, 0.85, 10, 32),
-    AttractionSpec(3, "ホラーハウス", 12, 46, 0.70, 10, 28),
-    AttractionSpec(4, "シアター", 88, 46, 0.55, 16, 36),
-    AttractionSpec(5, "カルーセル", 12, 84, 0.45, 12, 20),
-    AttractionSpec(6, "観覧車", 88, 84, 0.35, 12, 24),
+    AttractionSpec(0, "スカイコースター", 12, 15, 1.00, 8, 360),
+    AttractionSpec(1, "スプラッシュライド", 50, 10, 0.90, 8, 340),
+    AttractionSpec(2, "スペースフライト", 88, 15, 0.85, 10, 320),
+    AttractionSpec(3, "ホラーハウス", 12, 46, 0.70, 10, 280),
+    AttractionSpec(4, "シアター", 88, 46, 0.55, 16, 360),
+    AttractionSpec(5, "カルーセル", 12, 84, 0.45, 12, 200),
+    AttractionSpec(6, "観覧車", 88, 84, 0.35, 12, 240),
 )
 
 
 @dataclass(frozen=True, slots=True)
 class SimulationConfig:
     seed: int = 42
-    max_steps: int = 3600
-    step_seconds: int = 10
+    max_steps: int = 36000
+    step_seconds: int = 1
 
     visitor_count: int = 500
-    initial_visitor_count: int = 100
+    gate_capacity_per_step: int = 1
     entry_interval_steps: int = 2
     rides_to_exit: int = 5
-    movement_speed: float = 1.2
+    movement_speed: float = 0.36
+    path_lane_count: int = 3
 
     information_rate: float = 0.5
-    information_update_interval_steps: int = 12
+    information_update_interval_steps: int = 120
     information_delay_steps: int = 0
 
     preference_weight: float = 1.0
@@ -57,22 +58,24 @@ class SimulationConfig:
     choice_noise: float = 0.05
     no_info_prior_strength: float = 0.0
 
-    wait_reference_steps: float = 180.0
+    wait_reference_steps: float = 1800.0
     wait_norm_max: float = 3.0
 
     like_reward_weight: float = 1.0
     wait_penalty_weight: float = 0.7
     move_penalty_weight: float = 0.1
 
-    metric_record_interval_steps: int = 6
-    recent_oscillation_window_steps: int = 180
+    metric_record_interval_steps: int = 60
+    recent_oscillation_window_steps: int = 1800
 
     def validate(self) -> None:
         attraction_count = len(DEFAULT_ATTRACTION_SPECS)
         if self.visitor_count < 1:
             raise ValueError("visitor_count must be at least 1")
-        if not 0 <= self.initial_visitor_count <= self.visitor_count:
-            raise ValueError("initial_visitor_count must be between 0 and visitor_count")
+        if self.gate_capacity_per_step < 1:
+            raise ValueError("gate_capacity_per_step must be at least 1")
+        if self.path_lane_count < 1:
+            raise ValueError("path_lane_count must be at least 1")
         if not 1 <= self.rides_to_exit <= attraction_count:
             raise ValueError("rides_to_exit must be between 1 and attraction_count")
         if self.movement_speed <= 0:

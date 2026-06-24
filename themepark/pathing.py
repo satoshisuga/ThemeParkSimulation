@@ -18,6 +18,17 @@ class PathNode:
     y: float
 
 
+@dataclass(frozen=True, slots=True)
+class RouteStep:
+    x: float
+    y: float
+    segment_id: str | None = None
+
+    @property
+    def point(self) -> Point:
+        return (self.x, self.y)
+
+
 PATH_NODES: tuple[PathNode, ...] = (
     PathNode("gate", GATE_X, GATE_Y),
     PathNode("south_junction", 50.0, 90.0),
@@ -88,19 +99,31 @@ class PathNetwork:
             self._neighbors[left].append((right, distance))
             self._neighbors[right].append((left, distance))
 
-    def route_to_attraction(self, start: Point, attraction_id: int) -> list[Point]:
+    def route_to_attraction(self, start: Point, attraction_id: int) -> list[RouteStep]:
         return self.route_to_node(start, ATTRACTION_ENTRANCE_NODE_IDS[attraction_id])
 
-    def route_to_gate(self, start: Point) -> list[Point]:
+    def route_to_gate(self, start: Point) -> list[RouteStep]:
         return self.route_to_node(start, "gate")
 
-    def route_to_node(self, start: Point, end_node_id: str) -> list[Point]:
+    def route_to_node(self, start: Point, end_node_id: str) -> list[RouteStep]:
         start_node_id = self.nearest_node_id(start)
         node_path = self.shortest_node_path(start_node_id, end_node_id)
-        points = [self.nodes[node_id] for node_id in node_path]
-        if points and _distance(start, points[0]) < 1e-9:
-            return points[1:]
-        return points
+        steps: list[RouteStep] = []
+        first_point = self.nodes[node_path[0]]
+        if _distance(start, first_point) >= 1e-9:
+            steps.append(RouteStep(first_point[0], first_point[1]))
+        previous = node_path[0]
+        for current in node_path[1:]:
+            point = self.nodes[current]
+            steps.append(
+                RouteStep(
+                    point[0],
+                    point[1],
+                    segment_id=edge_id(previous, current),
+                )
+            )
+            previous = current
+        return steps
 
     def shortest_node_path(self, start_node_id: str, end_node_id: str) -> list[str]:
         if start_node_id == end_node_id:
@@ -136,9 +159,9 @@ class PathNetwork:
     def entrance_point(self, attraction_id: int) -> Point:
         return self.nodes[ATTRACTION_ENTRANCE_NODE_IDS[attraction_id]]
 
-    def serializable_edges(self) -> list[dict[str, Point]]:
+    def serializable_edges(self) -> list[dict[str, str | Point]]:
         return [
-            {"from": self.nodes[left], "to": self.nodes[right]}
+            {"id": edge_id(left, right), "from": self.nodes[left], "to": self.nodes[right]}
             for left, right in self.edges
         ]
 
@@ -147,19 +170,27 @@ def _distance(left: Point, right: Point) -> float:
     return hypot(left[0] - right[0], left[1] - right[1])
 
 
+def edge_id(left: str, right: str) -> str:
+    return "--".join(sorted((left, right)))
+
+
 DEFAULT_PATH_NETWORK = PathNetwork()
 
 
-def path_edges_payload() -> list[dict[str, dict[str, float]]]:
+def path_edges_payload() -> list[dict[str, str | dict[str, float]]]:
     return [
         {
-            "from": {"x": start[0], "y": start[1]},
-            "to": {"x": end[0], "y": end[1]},
+            "id": edge_id(left, right),
+            "from": {
+                "x": DEFAULT_PATH_NETWORK.nodes[left][0],
+                "y": DEFAULT_PATH_NETWORK.nodes[left][1],
+            },
+            "to": {
+                "x": DEFAULT_PATH_NETWORK.nodes[right][0],
+                "y": DEFAULT_PATH_NETWORK.nodes[right][1],
+            },
         }
-        for start, end in (
-            (DEFAULT_PATH_NETWORK.nodes[left], DEFAULT_PATH_NETWORK.nodes[right])
-            for left, right in DEFAULT_PATH_NETWORK.edges
-        )
+        for left, right in DEFAULT_PATH_NETWORK.edges
     ]
 
 
@@ -174,10 +205,11 @@ def attraction_entrances_payload() -> list[dict[str, float | int]]:
     ]
 
 
-def route_length(points: Iterable[Point]) -> float:
+def route_length(points: Iterable[Point | RouteStep]) -> float:
     total = 0.0
     previous: Point | None = None
-    for point in points:
+    for value in points:
+        point = value.point if isinstance(value, RouteStep) else value
         if previous is not None:
             total += _distance(previous, point)
         previous = point

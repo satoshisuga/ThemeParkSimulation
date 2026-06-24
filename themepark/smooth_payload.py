@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from math import cos, pi, sin
+from math import cos, hypot, pi, sin
 from typing import Any
 
 from themepark.config import GATE_X, GATE_Y, MAP_HEIGHT, MAP_WIDTH
@@ -102,6 +102,8 @@ def _visitor_payload(visitor, sim, queue_positions, rider_positions) -> dict[str
         x, y = queue_positions.get(visitor.id, (x, y))
     elif visitor.state == AgentState.RIDING:
         x, y = rider_positions.get(visitor.id, (x, y))
+    elif visitor.state in {AgentState.MOVING, AgentState.EXITING}:
+        x, y = _lane_adjusted_position(visitor, sim.config.path_lane_count)
     target = None
     if visitor.target_attraction_id is not None:
         target = sim.attractions[visitor.target_attraction_id].name
@@ -117,6 +119,26 @@ def _visitor_payload(visitor, sim, queue_positions, rider_positions) -> dict[str
         "satisfaction": visitor.satisfaction,
         "target": target,
     }
+
+
+def _lane_adjusted_position(visitor, lane_count: int) -> tuple[float, float]:
+    if (
+        visitor.current_segment_id is None
+        or visitor.route_index >= len(visitor.route)
+        or lane_count <= 1
+    ):
+        return visitor.x, visitor.y
+    target = visitor.route[visitor.route_index]
+    dx = target.x - visitor.x
+    dy = target.y - visitor.y
+    distance = hypot(dx, dy)
+    if distance <= 1e-9:
+        return visitor.x, visitor.y
+    lane_offset = (visitor.path_lane_index - (lane_count - 1) / 2) * 0.65
+    return (
+        visitor.x - dy / distance * lane_offset,
+        visitor.y + dx / distance * lane_offset,
+    )
 
 
 def _queue_positions(sim) -> dict[int, tuple[float, float]]:

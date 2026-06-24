@@ -736,7 +736,7 @@ INDEX_HTML = r"""<!doctype html>
       parkCtx.save();
       parkCtx.lineCap = "round";
       parkCtx.lineJoin = "round";
-      parkCtx.lineWidth = 15;
+      parkCtx.lineWidth = 21;
       parkCtx.strokeStyle = "#d7c9aa";
       for (const edge of appState.paths) {
         const start = toScreen(edge.from, width, height);
@@ -746,7 +746,7 @@ INDEX_HTML = r"""<!doctype html>
         parkCtx.lineTo(end.x, end.y);
         parkCtx.stroke();
       }
-      parkCtx.lineWidth = 2;
+      parkCtx.lineWidth = 3;
       parkCtx.strokeStyle = "#b9a476";
       for (const edge of appState.paths) {
         const start = toScreen(edge.from, width, height);

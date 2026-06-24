@@ -186,10 +186,8 @@ class Simulation:
     def _admit_visitors(self) -> None:
         if self.entered_count >= self.config.visitor_count:
             return
-        if self._step == 0:
-            admit_count = self.config.initial_visitor_count
-        elif self._step % self.config.entry_interval_steps == 0:
-            admit_count = 1
+        if self._step % self.config.entry_interval_steps == 0:
+            admit_count = self.config.gate_capacity_per_step
         else:
             admit_count = 0
         admit_count = min(admit_count, self.config.visitor_count - self.entered_count)
@@ -200,6 +198,8 @@ class Simulation:
             visitor.y = GATE_Y
             visitor.route.clear()
             visitor.route_index = 0
+            visitor.current_segment_id = None
+            visitor.path_lane_index = 0
             visitor.entered_at = self._step
             self.entered_count += 1
 
@@ -228,6 +228,8 @@ class Simulation:
                 visitor.target_attraction_id = None
                 visitor.route.clear()
                 visitor.route_index = 0
+                visitor.current_segment_id = None
+                visitor.path_lane_index = 0
                 visitor.queue_entered_at = None
                 visitor.current_trip_distance = 0.0
 
@@ -298,6 +300,8 @@ class Simulation:
                 visitor.target_attraction_id = None
                 visitor.route = self.path_network.route_to_gate((visitor.x, visitor.y))
                 visitor.route_index = 0
+                visitor.current_segment_id = None
+                visitor.path_lane_index = 0
             else:
                 visitor.state = AgentState.MOVING
                 visitor.target_attraction_id = target_id
@@ -306,24 +310,29 @@ class Simulation:
                     target_id,
                 )
                 visitor.route_index = 0
+                visitor.current_segment_id = None
+                visitor.path_lane_index = 0
 
     def _move_visitors(self) -> None:
         arrivals: dict[int, list[int]] = defaultdict(list)
+        segment_entries: dict[str, int] = defaultdict(int)
         for visitor in self.visitors:
             if visitor.state == AgentState.MOVING:
                 if visitor.target_attraction_id is None:
                     continue
-                arrived = self._move_along_route(visitor)
+                arrived = self._move_along_route(visitor, segment_entries)
                 if arrived:
                     arrivals[visitor.target_attraction_id].append(visitor.id)
             elif visitor.state == AgentState.EXITING:
-                arrived = self._move_along_route(visitor)
+                arrived = self._move_along_route(visitor, segment_entries)
                 if arrived:
                     visitor.state = AgentState.EXITED
                     visitor.exited_at = self._step
                     visitor.target_attraction_id = None
                     visitor.route.clear()
                     visitor.route_index = 0
+                    visitor.current_segment_id = None
+                    visitor.path_lane_index = 0
 
         for attraction_id, visitor_ids in arrivals.items():
             ordered_ids = visitor_ids
@@ -336,21 +345,46 @@ class Simulation:
                 visitor.queue_entered_at = self._step
                 visitor.route.clear()
                 visitor.route_index = 0
+                visitor.current_segment_id = None
+                visitor.path_lane_index = 0
                 attraction.queue.append(visitor_id)
 
-    def _move_along_route(self, visitor: VisitorAgent) -> bool:
+    def _move_along_route(
+        self,
+        visitor: VisitorAgent,
+        segment_entries: dict[str, int],
+    ) -> bool:
         remaining = self.config.movement_speed
         while remaining > 1e-9:
             if visitor.route_index >= len(visitor.route):
                 return True
-            target_x, target_y = visitor.route[visitor.route_index]
-            distance = self._move_toward(visitor, target_x, target_y, remaining)
+            route_step = visitor.route[visitor.route_index]
+            if not self._enter_route_segment(visitor, route_step.segment_id, segment_entries):
+                return False
+            distance = self._move_toward(visitor, route_step.x, route_step.y, remaining)
             remaining -= distance
-            if hypot(visitor.x - target_x, visitor.y - target_y) <= 1e-9:
+            if hypot(visitor.x - route_step.x, visitor.y - route_step.y) <= 1e-9:
                 visitor.route_index += 1
+                visitor.current_segment_id = None
             else:
                 return False
         return visitor.route_index >= len(visitor.route)
+
+    def _enter_route_segment(
+        self,
+        visitor: VisitorAgent,
+        segment_id: str | None,
+        segment_entries: dict[str, int],
+    ) -> bool:
+        if segment_id is None or visitor.current_segment_id == segment_id:
+            return True
+        entered_count = segment_entries[segment_id]
+        if entered_count >= self.config.path_lane_count:
+            return False
+        segment_entries[segment_id] = entered_count + 1
+        visitor.current_segment_id = segment_id
+        visitor.path_lane_index = entered_count
+        return True
 
     def _move_toward(
         self,
