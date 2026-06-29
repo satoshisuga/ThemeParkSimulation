@@ -40,10 +40,13 @@ class SimulationConfig:
 
     visitor_count: int = 500
     gate_capacity_per_step: int = 1
-    entry_interval_steps: int = 2
+    entry_interval_steps: int = 5
     rides_to_exit: int = 5
-    movement_speed: float = 0.36
+    movement_speed: float = 0.45
     path_lane_count: int = 3
+    path_lane_spacing: float = 0.65
+    attraction_exit_spacing: float = 1.6
+    attraction_loading_wait_steps: int = 60
 
     information_rate: float = 0.5
     information_update_interval_steps: int = 120
@@ -76,6 +79,12 @@ class SimulationConfig:
             raise ValueError("gate_capacity_per_step must be at least 1")
         if self.path_lane_count < 1:
             raise ValueError("path_lane_count must be at least 1")
+        if self.path_lane_spacing < 0:
+            raise ValueError("path_lane_spacing must be non-negative")
+        if self.attraction_exit_spacing < 0:
+            raise ValueError("attraction_exit_spacing must be non-negative")
+        if self.attraction_loading_wait_steps < 0:
+            raise ValueError("attraction_loading_wait_steps must be non-negative")
         if not 1 <= self.rides_to_exit <= attraction_count:
             raise ValueError("rides_to_exit must be between 1 and attraction_count")
         if self.movement_speed <= 0:

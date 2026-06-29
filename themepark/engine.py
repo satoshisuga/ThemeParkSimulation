@@ -200,6 +200,8 @@ class Simulation:
             visitor.route_index = 0
             visitor.current_segment_id = None
             visitor.path_lane_index = 0
+            visitor.release_offset_x = 0.0
+            visitor.release_offset_y = 0.0
             visitor.entered_at = self._step
             self.entered_count += 1
 
@@ -214,6 +216,7 @@ class Simulation:
                 continue
             riders = list(attraction.riders)
             attraction.riders.clear()
+            self._space_released_riders(riders)
             for visitor_id in riders:
                 visitor = self.visitors[visitor_id]
                 visitor.visited[attraction.id] = True
@@ -235,7 +238,13 @@ class Simulation:
 
     def _board_waiting_visitors(self) -> None:
         for attraction in self.attractions:
-            if attraction.riders or not attraction.queue:
+            if attraction.riders:
+                attraction.loading_started_at = None
+                continue
+            if not attraction.queue:
+                attraction.loading_started_at = None
+                continue
+            if not self._is_ready_to_board(attraction):
                 continue
             boarding_count = min(attraction.capacity, len(attraction.queue))
             for _ in range(boarding_count):
@@ -249,11 +258,25 @@ class Simulation:
                 visitor.last_queue_wait_steps = int(wait_steps)
                 visitor.total_wait_steps += int(wait_steps)
                 visitor.state = AgentState.RIDING
+                visitor.release_offset_x = 0.0
+                visitor.release_offset_y = 0.0
                 attraction.riders.append(visitor_id)
                 self.completed_rides += 1
                 self.total_completed_wait_steps += int(wait_steps)
             if attraction.riders:
                 attraction.cycle_remaining_steps = attraction.service_duration_steps
+                attraction.loading_started_at = None
+
+    def _is_ready_to_board(self, attraction: Attraction) -> bool:
+        if len(attraction.queue) >= attraction.capacity:
+            return True
+        if attraction.loading_started_at is None:
+            attraction.loading_started_at = self._step
+            return False
+        return (
+            self._step - attraction.loading_started_at
+            >= self.config.attraction_loading_wait_steps
+        )
 
     def _choose_destinations_synchronously(self) -> None:
         choosing = [
@@ -333,6 +356,8 @@ class Simulation:
                     visitor.route_index = 0
                     visitor.current_segment_id = None
                     visitor.path_lane_index = 0
+                    visitor.release_offset_x = 0.0
+                    visitor.release_offset_y = 0.0
 
         for attraction_id, visitor_ids in arrivals.items():
             ordered_ids = visitor_ids
@@ -347,6 +372,8 @@ class Simulation:
                 visitor.route_index = 0
                 visitor.current_segment_id = None
                 visitor.path_lane_index = 0
+                visitor.release_offset_x = 0.0
+                visitor.release_offset_y = 0.0
                 attraction.queue.append(visitor_id)
 
     def _move_along_route(
@@ -366,6 +393,8 @@ class Simulation:
             if hypot(visitor.x - route_step.x, visitor.y - route_step.y) <= 1e-9:
                 visitor.route_index += 1
                 visitor.current_segment_id = None
+                visitor.release_offset_x = 0.0
+                visitor.release_offset_y = 0.0
             else:
                 return False
         return visitor.route_index >= len(visitor.route)
@@ -385,6 +414,25 @@ class Simulation:
         visitor.current_segment_id = segment_id
         visitor.path_lane_index = entered_count
         return True
+
+    def _space_released_riders(self, rider_ids: list[int]) -> None:
+        count = len(rider_ids)
+        if count <= 1:
+            for visitor_id in rider_ids:
+                visitor = self.visitors[visitor_id]
+                visitor.release_offset_x = 0.0
+                visitor.release_offset_y = 0.0
+            return
+        lane_count = self.config.path_lane_count
+        lane_center = (lane_count - 1) / 2
+        for index, visitor_id in enumerate(rider_ids):
+            visitor = self.visitors[visitor_id]
+            lane = index % lane_count
+            row = index // lane_count
+            visitor.release_offset_x = (
+                (lane - lane_center) * self.config.path_lane_spacing
+            )
+            visitor.release_offset_y = row * self.config.attraction_exit_spacing
 
     def _move_toward(
         self,

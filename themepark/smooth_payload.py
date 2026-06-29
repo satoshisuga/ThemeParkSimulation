@@ -103,7 +103,7 @@ def _visitor_payload(visitor, sim, queue_positions, rider_positions) -> dict[str
     elif visitor.state == AgentState.RIDING:
         x, y = rider_positions.get(visitor.id, (x, y))
     elif visitor.state in {AgentState.MOVING, AgentState.EXITING}:
-        x, y = _lane_adjusted_position(visitor, sim.config.path_lane_count)
+        x, y = _lane_adjusted_position(visitor, sim.config)
     target = None
     if visitor.target_attraction_id is not None:
         target = sim.attractions[visitor.target_attraction_id].name
@@ -121,23 +121,34 @@ def _visitor_payload(visitor, sim, queue_positions, rider_positions) -> dict[str
     }
 
 
-def _lane_adjusted_position(visitor, lane_count: int) -> tuple[float, float]:
-    if (
-        visitor.current_segment_id is None
-        or visitor.route_index >= len(visitor.route)
-        or lane_count <= 1
-    ):
-        return visitor.x, visitor.y
+def _lane_adjusted_position(visitor, config) -> tuple[float, float]:
+    if visitor.route_index >= len(visitor.route):
+        return (
+            visitor.x + visitor.release_offset_x,
+            visitor.y + visitor.release_offset_y,
+        )
     target = visitor.route[visitor.route_index]
     dx = target.x - visitor.x
     dy = target.y - visitor.y
     distance = hypot(dx, dy)
     if distance <= 1e-9:
         return visitor.x, visitor.y
-    lane_offset = (visitor.path_lane_index - (lane_count - 1) / 2) * 0.65
+    lane_offset = 0.0
+    if visitor.current_segment_id is not None and config.path_lane_count > 1:
+        lane_offset = (
+            visitor.path_lane_index - (config.path_lane_count - 1) / 2
+        ) * config.path_lane_spacing
+    lateral_offset = lane_offset
+    if visitor.current_segment_id is None:
+        lateral_offset += visitor.release_offset_x
+    forward_offset = visitor.release_offset_y
+    unit_x = dx / distance
+    unit_y = dy / distance
+    normal_x = -unit_y
+    normal_y = unit_x
     return (
-        visitor.x - dy / distance * lane_offset,
-        visitor.y + dx / distance * lane_offset,
+        visitor.x + normal_x * lateral_offset + unit_x * forward_offset,
+        visitor.y + normal_y * lateral_offset + unit_y * forward_offset,
     )
 
 

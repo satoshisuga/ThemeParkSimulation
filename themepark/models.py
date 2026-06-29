@@ -41,6 +41,8 @@ class VisitorAgent:
     route_index: int = 0
     current_segment_id: str | None = None
     path_lane_index: int = 0
+    release_offset_x: float = 0.0
+    release_offset_y: float = 0.0
 
     entered_at: int | None = None
     exited_at: int | None = None
@@ -69,6 +71,7 @@ class Attraction:
     queue: deque[int] = field(default_factory=deque)
     riders: list[int] = field(default_factory=list)
     cycle_remaining_steps: int = 0
+    loading_started_at: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
