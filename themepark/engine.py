@@ -31,6 +31,7 @@ class Simulation:
         self.visitors = self._build_visitors(self._common)
         self.congestion = CongestionInfo(config, len(self.attractions))
         self._step = 0
+        self._next_entry_step = 0
         self.entered_count = 0
         self.completed_rides = 0
         self.total_completed_wait_steps = 0
@@ -186,10 +187,10 @@ class Simulation:
     def _admit_visitors(self) -> None:
         if self.entered_count >= self.config.visitor_count:
             return
-        if self._step % self.config.entry_interval_steps == 0:
-            admit_count = self.config.gate_capacity_per_step
-        else:
-            admit_count = 0
+        if self._step < self._next_entry_step:
+            return
+        admit_count = self._draw_entry_group_size()
+        self._next_entry_step = self._step + self._draw_entry_interval()
         admit_count = min(admit_count, self.config.visitor_count - self.entered_count)
         for _ in range(admit_count):
             visitor = self.visitors[self.entered_count]
@@ -204,6 +205,22 @@ class Simulation:
             visitor.release_offset_y = 0.0
             visitor.entered_at = self._step
             self.entered_count += 1
+
+    def _draw_entry_group_size(self) -> int:
+        return int(
+            self._rngs.runtime.integers(
+                self.config.entry_group_min,
+                self.config.entry_group_max + 1,
+            )
+        )
+
+    def _draw_entry_interval(self) -> int:
+        return int(
+            self._rngs.runtime.integers(
+                self.config.entry_interval_min_steps,
+                self.config.entry_interval_max_steps + 1,
+            )
+        )
 
     def _advance_ride_cycles(self) -> None:
         for attraction in self.attractions:

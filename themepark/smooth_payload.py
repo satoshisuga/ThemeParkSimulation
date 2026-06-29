@@ -62,6 +62,8 @@ def build_state_payload(sim, *, max_visitors: int = 1200) -> dict[str, Any]:
                 "popularity": attraction.popularity,
                 "queue": len(attraction.queue),
                 "riders": len(attraction.riders),
+                "nextStartStatus": _next_start_status(attraction),
+                "nextStartRemainingSeconds": _next_start_remaining_seconds(attraction, sim),
                 "actualWaitMinutes": _wait_minutes(
                     actual_waits[attraction.id],
                     sim.config.step_seconds,
@@ -94,6 +96,31 @@ def build_state_payload(sim, *, max_visitors: int = 1200) -> dict[str, Any]:
             sim.config.information_delay_steps,
         ),
     }
+
+
+def _next_start_status(attraction) -> str:
+    if attraction.riders:
+        return "running"
+    if len(attraction.queue) >= attraction.capacity:
+        return "ready"
+    if attraction.queue and attraction.loading_started_at is not None:
+        return "loading"
+    return "idle"
+
+
+def _next_start_remaining_seconds(attraction, sim) -> int | None:
+    if attraction.riders:
+        return attraction.cycle_remaining_steps * sim.config.step_seconds
+    if len(attraction.queue) >= attraction.capacity:
+        return 0
+    if attraction.queue and attraction.loading_started_at is not None:
+        remaining_steps = max(
+            0,
+            sim.config.attraction_loading_wait_steps
+            - (sim.step_count - attraction.loading_started_at),
+        )
+        return remaining_steps * sim.config.step_seconds
+    return None
 
 
 def _visitor_payload(visitor, sim, queue_positions, rider_positions) -> dict[str, Any]:

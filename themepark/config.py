@@ -39,10 +39,12 @@ class SimulationConfig:
     step_seconds: int = 1
 
     visitor_count: int = 500
-    gate_capacity_per_step: int = 1
-    entry_interval_steps: int = 5
+    entry_interval_min_steps: int = 1
+    entry_interval_max_steps: int = 4
+    entry_group_min: int = 1
+    entry_group_max: int = 3
     rides_to_exit: int = 5
-    movement_speed: float = 0.45
+    movement_speed: float = 1.15
     path_lane_count: int = 3
     path_lane_spacing: float = 0.65
     attraction_exit_spacing: float = 1.6
@@ -75,8 +77,10 @@ class SimulationConfig:
         attraction_count = len(DEFAULT_ATTRACTION_SPECS)
         if self.visitor_count < 1:
             raise ValueError("visitor_count must be at least 1")
-        if self.gate_capacity_per_step < 1:
-            raise ValueError("gate_capacity_per_step must be at least 1")
+        if self.entry_group_min < 1:
+            raise ValueError("entry_group_min must be at least 1")
+        if self.entry_group_max < self.entry_group_min:
+            raise ValueError("entry_group_max must be at least entry_group_min")
         if self.path_lane_count < 1:
             raise ValueError("path_lane_count must be at least 1")
         if self.path_lane_spacing < 0:
@@ -95,8 +99,10 @@ class SimulationConfig:
             raise ValueError("information_update_interval_steps must be at least 1")
         if self.information_delay_steps < 0:
             raise ValueError("information_delay_steps must be non-negative")
-        if self.entry_interval_steps < 1:
-            raise ValueError("entry_interval_steps must be at least 1")
+        if self.entry_interval_min_steps < 1:
+            raise ValueError("entry_interval_min_steps must be at least 1")
+        if self.entry_interval_max_steps < self.entry_interval_min_steps:
+            raise ValueError("entry_interval_max_steps must be at least entry_interval_min_steps")
         if self.distance_weight_sd < 0:
             raise ValueError("distance_weight_sd must be non-negative")
         if self.congestion_weight_sd < 0:

@@ -551,6 +551,27 @@ INDEX_HTML = r"""<!doctype html>
       return value === null || value === undefined ? "-" : Number(value).toFixed(digits);
     }
 
+    function formatDurationSeconds(seconds) {
+      const total = Math.max(0, Math.ceil(Number(seconds)));
+      const minutes = Math.floor(total / 60);
+      const rest = String(total % 60).padStart(2, "0");
+      return `${minutes}:${rest}`;
+    }
+
+    function nextStartLabel(attraction) {
+      const seconds = attraction.nextStartRemainingSeconds;
+      if (seconds === null || seconds === undefined) {
+        return "";
+      }
+      if (attraction.nextStartStatus === "loading") {
+        return `開始まで ${formatDurationSeconds(seconds)}`;
+      }
+      if (attraction.nextStartStatus === "ready") {
+        return "開始待ち";
+      }
+      return `残り ${formatDurationSeconds(seconds)}`;
+    }
+
     async function loadPresets() {
       const response = await fetch("/api/presets");
       const data = await response.json();
@@ -767,6 +788,7 @@ INDEX_HTML = r"""<!doctype html>
         const radius = 8 + attraction.popularity * 6;
         const queueRatio = attraction.queue / maxQueue;
         const hue = 205 - queueRatio * 155;
+        const nextStartText = nextStartLabel(attraction);
         parkCtx.beginPath();
         parkCtx.arc(point.x, point.y, radius, 0, Math.PI * 2);
         parkCtx.fillStyle = `hsl(${hue}, 70%, 50%)`;
@@ -774,12 +796,33 @@ INDEX_HTML = r"""<!doctype html>
         parkCtx.lineWidth = 1.2;
         parkCtx.strokeStyle = "#0f172a";
         parkCtx.stroke();
-        parkCtx.fillStyle = "#0f172a";
-        parkCtx.font = "600 11px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
-        parkCtx.fillText(`${attraction.id}: ${attraction.name}`, point.x, point.y - radius - 7);
-        parkCtx.font = "11px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
-        parkCtx.fillStyle = "#475569";
-        parkCtx.fillText(`待ち ${attraction.queue}`, point.x, point.y + radius + 13);
+        const labelLines = [
+          {
+            text: `${attraction.id}: ${attraction.name}`,
+            font: "600 11px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+            color: "#0f172a",
+          },
+        ];
+        if (nextStartText) {
+          labelLines.push({
+            text: nextStartText,
+            font: "600 10px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+            color: "#334155",
+          });
+        }
+        labelLines.push({
+          text: `待ち ${attraction.queue}`,
+          font: "11px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+          color: "#475569",
+        });
+        const labelGap = 13;
+        const labelStartY = point.y - radius - 7 - (labelLines.length - 1) * labelGap;
+        for (let index = 0; index < labelLines.length; index += 1) {
+          const line = labelLines[index];
+          parkCtx.font = line.font;
+          parkCtx.fillStyle = line.color;
+          parkCtx.fillText(line.text, point.x, labelStartY + index * labelGap);
+        }
         hoverTargets.push({
           x: point.x,
           y: point.y,
@@ -788,6 +831,7 @@ INDEX_HTML = r"""<!doctype html>
             `<strong>${attraction.name}</strong>`,
             `行列: ${attraction.queue}人`,
             `搭乗中: ${attraction.riders}人`,
+            `次回開始: ${nextStartText || "-"}`,
             `実推定待ち: ${attraction.actualWaitMinutes ?? "-"}分`,
             `表示待ち: ${attraction.displayedWaitMinutes ?? "-"}分`,
           ].join("<br>")
